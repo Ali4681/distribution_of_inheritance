@@ -1,0 +1,225 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum CaseStatus {
+  DRAFT
+  CALCULATED
+  CLOSED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum RelationType {
+  FATHER
+  MOTHER
+  HUSBAND
+  WIFE
+  SON
+  DAUGHTER
+  SON_OF_SON
+  DAUGHTER_OF_SON
+  BROTHER
+  SISTER
+  FULL_BROTHER
+  FULL_SISTER
+  PATERNAL_BROTHER
+  PATERNAL_SISTER
+  MATERNAL_BROTHER
+  MATERNAL_SISTER
+  PATERNAL_GRANDFATHER
+  PATERNAL_GRANDMOTHER
+  MATERNAL_GRANDFATHER
+  MATERNAL_GRANDMOTHER
+  PATERNAL_UNCLE
+  PATERNAL_UNCLE_FULL
+  PATERNAL_UNCLE_PATERNAL
+  MATERNAL_UNCLE
+  PATERNAL_AUNT
+  MATERNAL_AUNT
+  OTHER
+}
+
+enum BlockType {
+  FULL_BLOCK
+  PARTIAL_BLOCK
+}
+
+enum ReportType {
+  PDF
+  SUMMARY
+}
+
+enum Language {
+  AR
+  EN
+}
+
+// ─────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(USER)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  cases     Case[]
+  reports   Report[]
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────
+// CASES
+// ─────────────────────────────────────────
+
+model Case {
+  id            String     @id @default(uuid())
+  ownerId       String     @map("owner_id")
+  deceasedName  String     @map("deceased_name")
+  deathDate     DateTime   @map("death_date")
+  totalEstate   Decimal    @map("total_estate") @db.Decimal(18, 2)
+  funeralCosts  Decimal    @default(0) @map("funeral_costs") @db.Decimal(18, 2)
+  debts         Decimal    @default(0) @db.Decimal(18, 2)
+  mandatoryWill Decimal    @default(0) @map("mandatory_will") @db.Decimal(18, 2)
+  optionalWill  Decimal    @default(0) @map("optional_will") @db.Decimal(18, 2)
+  currency      String     @default("SAR")
+  status        CaseStatus @default(DRAFT)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  owner         User           @relation(fields: [ownerId], references: [id])
+  familyMembers FamilyMember[]
+  heirs         Heir[]
+  reports       Report[]
+  auditLogs     AuditLog[]
+
+  @@map("cases")
+}
+
+// ─────────────────────────────────────────
+// FAMILY MEMBERS
+// ─────────────────────────────────────────
+
+model FamilyMember {
+  id           String       @id @default(uuid())
+  caseId       String       @map("case_id")
+  parentId     String?      @map("parent_id")
+  fullName     String       @map("full_name")
+  gender       Gender
+  relationType RelationType @map("relation_type")
+  isAlive      Boolean      @default(true) @map("is_alive")
+  isMuslim     Boolean      @default(true) @map("is_muslim")
+  isMurderer   Boolean      @default(false) @map("is_murderer")
+  birthDate    DateTime?    @map("birth_date")
+
+  case     Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  parent   FamilyMember?  @relation("FamilyTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children FamilyMember[] @relation("FamilyTree")
+  heir     Heir?
+
+  @@map("family_members")
+}
+
+// ─────────────────────────────────────────
+// HEIRS
+// ─────────────────────────────────────────
+
+model Heir {
+  id               String   @id @default(uuid())
+  caseId           String   @map("case_id")
+  memberId         String   @unique @map("member_id")
+  isEligible       Boolean  @map("is_eligible")
+  shareFraction    String?  @map("share_fraction")
+  sharePercentage  Decimal? @map("share_percentage") @db.Decimal(10, 6)
+  monetaryValue    Decimal? @map("monetary_value") @db.Decimal(18, 2)
+  legalBasis       String?  @map("legal_basis")
+  calculatedAt     DateTime @default(now()) @map("calculated_at")
+
+  case          Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  member        FamilyMember   @relation(fields: [memberId], references: [id])
+  blockedBy     BlockedHeir[]  @relation("BlockedHeir")
+  blocking      BlockedHeir[]  @relation("BlockingHeir")
+
+  @@map("heirs")
+}
+
+// ─────────────────────────────────────────
+// BLOCKED HEIRS
+// ─────────────────────────────────────────
+
+model BlockedHeir {
+  id           String    @id @default(uuid())
+  heirId       String    @map("heir_id")
+  blockedById  String    @map("blocked_by_id")
+  blockReason  String    @map("block_reason")
+  blockType    BlockType @map("block_type")
+
+  heir      Heir @relation("BlockedHeir", fields: [heirId], references: [id], onDelete: Cascade)
+  blockedBy Heir @relation("BlockingHeir", fields: [blockedById], references: [id])
+
+  @@map("blocked_heirs")
+}
+
+// ─────────────────────────────────────────
+// REPORTS
+// ─────────────────────────────────────────
+
+model Report {
+  id          String     @id @default(uuid())
+  caseId      String     @map("case_id")
+  generatedBy String     @map("generated_by")
+  filePath    String     @map("file_path")
+  reportType  ReportType @map("report_type")
+  language    Language   @default(AR)
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  case      Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  generator User @relation(fields: [generatedBy], references: [id])
+
+  @@map("reports")
+}
+
+// ─────────────────────────────────────────
+// AUDIT LOGS
+// ─────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  caseId      String?  @map("case_id")
+  action      String
+  changes     Json?
+  ipAddress   String?  @map("ip_address")
+  performedAt DateTime @default(now()) @map("performed_at")
+
+  user User  @relation(fields: [userId], references: [id])
+  case Case? @relation(fields: [caseId], references: [id])
+
+  @@map("audit_logs")
+}

@@ -1,0 +1,2 @@
+- [Inheritance Backend Project](project_inheritance_backend.md) — NestJS backend for Syrian inheritance law distribution, port 8000, full module list
+- [NestJS Patterns for Inheritance System](feedback_nestjs_patterns.md) — AuthUser type, JWT secret consistency, dotenv loading order
