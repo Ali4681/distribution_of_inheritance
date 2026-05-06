@@ -34,6 +34,22 @@ export function formatDate(value: string | Date | null | undefined, locale: Loca
   }).format(date);
 }
 
+export function formatDateTime(
+  value: string | Date | null | undefined,
+  locale: Locale,
+) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat(latinDigitLocales[locale], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export function percentage(value: number | string | null | undefined) {
   const numeric = Number(value ?? 0);
   return `${Number.isFinite(numeric) ? numeric.toFixed(4) : "0.0000"}%`;

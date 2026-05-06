@@ -28,7 +28,7 @@ export default function RootLayout({
       suppressHydrationWarning
       data-scroll-behavior="smooth"
     >
-      <body>
+      <body suppressHydrationWarning>
         <StyledJsxRegistry>
           <AppProvider>
             <DialogProvider>

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { CaseStatus, Role } from '@prisma/client';
 import { AuthUser } from '../auth/auth-user';
+import { AuditLogsService } from '../audit_logs/audit_logs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { InheritanceCalculator } from './inheritance-calculator';
 
@@ -12,9 +13,12 @@ import { InheritanceCalculator } from './inheritance-calculator';
 export class HeirsService {
   private readonly calculator = new InheritanceCalculator();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogs: AuditLogsService,
+  ) {}
 
-  async calculate(caseId: string, user: AuthUser) {
+  async calculate(caseId: string, user: AuthUser, ipAddress?: string) {
     const inheritanceCase = await this.assertCanAccessCase(caseId, user);
     const members = await this.prisma.familyMember.findMany({
       where: { caseId },
@@ -99,8 +103,8 @@ export class HeirsService {
         data: { status: CaseStatus.CALCULATED },
       });
 
-      await tx.auditLog.create({
-        data: {
+      await this.auditLogs.record(
+        {
           userId: user.id,
           caseId,
           action: 'INHERITANCE_CALCULATED',
@@ -109,8 +113,10 @@ export class HeirsService {
             totalEstate: Number(inheritanceCase.totalEstate),
             distributableEstate,
           },
+          ipAddress,
         },
-      });
+        tx,
+      );
 
       return createdCount;
     });
@@ -165,7 +171,7 @@ export class HeirsService {
     return heir;
   }
 
-  async clearCase(caseId: string, user: AuthUser) {
+  async clearCase(caseId: string, user: AuthUser, ipAddress?: string) {
     await this.assertCanAccessCase(caseId, user);
 
     const heirs = await this.prisma.heir.findMany({
@@ -174,18 +180,30 @@ export class HeirsService {
     });
     const heirIds = heirs.map((heir) => heir.id);
 
-    await this.prisma.$transaction([
-      this.prisma.blockedHeir.deleteMany({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.blockedHeir.deleteMany({
         where: {
           OR: [{ heirId: { in: heirIds } }, { blockedById: { in: heirIds } }],
         },
-      }),
-      this.prisma.heir.deleteMany({ where: { caseId } }),
-      this.prisma.case.update({
+      });
+      await tx.heir.deleteMany({ where: { caseId } });
+      await tx.case.update({
         where: { id: caseId },
         data: { status: CaseStatus.DRAFT },
-      }),
-    ]);
+      });
+      await this.auditLogs.record(
+        {
+          userId: user.id,
+          caseId,
+          action: 'HEIRS_CLEARED',
+          changes: {
+            removedHeirs: heirIds.length,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+    });
 
     return { status: true, message: 'Calculated heirs were cleared' };
   }

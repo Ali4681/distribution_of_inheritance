@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthUser } from '../auth/auth-user';
+import { getRequestIp } from '../common/request-ip';
 import { JwtAuthGuard } from '../auth/guard/jwt.guard';
 import { HeirsService } from './heirs.service';
 
@@ -23,7 +24,11 @@ export class HeirsController {
     @Param('caseId') caseId: string,
     @Req() request: Request & { user: AuthUser },
   ) {
-    return this.heirsService.calculate(caseId, request.user);
+    return this.heirsService.calculate(
+      caseId,
+      request.user,
+      getRequestIp(request),
+    );
   }
 
   @Get()
@@ -47,6 +52,10 @@ export class HeirsController {
     @Param('caseId') caseId: string,
     @Req() request: Request & { user: AuthUser },
   ) {
-    return this.heirsService.clearCase(caseId, request.user);
+    return this.heirsService.clearCase(
+      caseId,
+      request.user,
+      getRequestIp(request),
+    );
   }
 }

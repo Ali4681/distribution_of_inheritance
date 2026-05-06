@@ -39,6 +39,12 @@ export default function Sidebar({
     { href: "/cases/new", label: t.newCase, icon: "plus" },
     { href: "/admin/users", label: t.users, icon: "users", adminOnly: true },
     {
+      href: "/admin/audit-logs",
+      label: t.auditLogs,
+      icon: "activity",
+      adminOnly: true,
+    },
+    {
       href: "/admin/cases",
       label: t.adminCases,
       icon: "shield",

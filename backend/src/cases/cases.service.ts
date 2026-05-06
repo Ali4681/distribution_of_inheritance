@@ -3,13 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CaseStatus, Prisma, Role } from '@prisma/client';
+import { CaseStatus, Role } from '@prisma/client';
 import { AuthUser } from '../auth/auth-user';
+import { AuditLogsService } from '../audit_logs/audit_logs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCaseDto } from './dto/create-case.dto';
 import { UpdateCaseDto } from './dto/update-case.dto';
-
-type AuditChanges = Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput;
 
 const caseInclude = {
   familyMembers: {
@@ -26,9 +25,16 @@ const caseInclude = {
 
 @Injectable()
 export class CasesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogs: AuditLogsService,
+  ) {}
 
-  async create(createCaseDto: CreateCaseDto, user: AuthUser) {
+  async create(
+    createCaseDto: CreateCaseDto,
+    user: AuthUser,
+    ipAddress?: string,
+  ) {
     const createdCase = await this.prisma.case.create({
       data: {
         ownerId: user.id,
@@ -44,7 +50,13 @@ export class CasesService {
       include: caseInclude,
     });
 
-    await this.audit(user, createdCase.id, 'CASE_CREATED', createCaseDto);
+    await this.auditLogs.record({
+      userId: user.id,
+      caseId: createdCase.id,
+      action: 'CASE_CREATED',
+      changes: createCaseDto,
+      ipAddress,
+    });
 
     return createdCase;
   }
@@ -70,7 +82,12 @@ export class CasesService {
     });
   }
 
-  async update(id: string, updateCaseDto: UpdateCaseDto, user: AuthUser) {
+  async update(
+    id: string,
+    updateCaseDto: UpdateCaseDto,
+    user: AuthUser,
+    ipAddress?: string,
+  ) {
     await this.assertCanAccessCase(id, user);
 
     const updatedCase = await this.prisma.case.update({
@@ -90,7 +107,13 @@ export class CasesService {
       include: caseInclude,
     });
 
-    await this.audit(user, id, 'CASE_UPDATED', updateCaseDto);
+    await this.auditLogs.record({
+      userId: user.id,
+      caseId: id,
+      action: 'CASE_UPDATED',
+      changes: updateCaseDto,
+      ipAddress,
+    });
 
     return updatedCase;
   }
@@ -105,8 +128,8 @@ export class CasesService {
     });
   }
 
-  async remove(id: string, user: AuthUser) {
-    await this.assertCanAccessCase(id, user);
+  async remove(id: string, user: AuthUser, ipAddress?: string) {
+    const existingCase = await this.assertCanAccessCase(id, user);
 
     const heirs = await this.prisma.heir.findMany({
       where: { caseId: id },
@@ -114,16 +137,33 @@ export class CasesService {
     });
     const heirIds = heirs.map((heir) => heir.id);
 
-    await this.prisma.$transaction([
-      this.prisma.blockedHeir.deleteMany({
+    await this.prisma.$transaction(async (tx) => {
+      await this.auditLogs.record(
+        {
+          userId: user.id,
+          caseId: null,
+          action: 'CASE_DELETED',
+          changes: {
+            caseId: existingCase.id,
+            deceasedName: existingCase.deceasedName,
+            status: existingCase.status,
+            totalEstate: Number(existingCase.totalEstate),
+            currency: existingCase.currency,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+
+      await tx.blockedHeir.deleteMany({
         where: {
           OR: [{ heirId: { in: heirIds } }, { blockedById: { in: heirIds } }],
         },
-      }),
-      this.prisma.heir.deleteMany({ where: { caseId: id } }),
-      this.prisma.auditLog.deleteMany({ where: { caseId: id } }),
-      this.prisma.case.delete({ where: { id } }),
-    ]);
+      });
+      await tx.heir.deleteMany({ where: { caseId: id } });
+      await this.auditLogs.detachCase(id, tx);
+      await tx.case.delete({ where: { id } });
+    });
 
     return { status: true, message: 'Case deleted successfully' };
   }
@@ -131,7 +171,14 @@ export class CasesService {
   async assertCanAccessCase(caseId: string, user: AuthUser) {
     const existingCase = await this.prisma.case.findUnique({
       where: { id: caseId },
-      select: { id: true, ownerId: true },
+      select: {
+        id: true,
+        ownerId: true,
+        deceasedName: true,
+        totalEstate: true,
+        currency: true,
+        status: true,
+      },
     });
 
     if (!existingCase) {
@@ -143,78 +190,5 @@ export class CasesService {
     }
 
     return existingCase;
-  }
-
-  async audit(
-    user: AuthUser,
-    caseId: string | null,
-    action: string,
-    changes?: unknown,
-  ) {
-    await this.prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        caseId,
-        action,
-        changes: this.toAuditChanges(changes),
-      },
-    });
-  }
-
-  private toAuditChanges(value: unknown): AuditChanges | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-
-    if (value === null) {
-      return Prisma.JsonNull;
-    }
-
-    const nestedJson = this.toNestedJson(value);
-    return nestedJson === null ? Prisma.JsonNull : nestedJson;
-  }
-
-  private toNestedJson(value: unknown): Prisma.InputJsonValue | null {
-    if (value === undefined || value === null) {
-      return null;
-    }
-
-    if (typeof value === 'string' || typeof value === 'boolean') {
-      return value;
-    }
-
-    if (typeof value === 'number') {
-      return Number.isFinite(value) ? value : String(value);
-    }
-
-    if (
-      typeof value === 'bigint' ||
-      typeof value === 'symbol' ||
-      typeof value === 'function'
-    ) {
-      return String(value);
-    }
-
-    if (value instanceof Date) {
-      return value.toISOString();
-    }
-
-    if (Array.isArray(value)) {
-      return value.map((item) => this.toNestedJson(item));
-    }
-
-    if (typeof value === 'object') {
-      const jsonObject: Record<string, Prisma.InputJsonValue | null> = {};
-
-      for (const [key, item] of Object.entries(
-        value as Record<string, unknown>,
-      )) {
-        jsonObject[key] = this.toNestedJson(item);
-      }
-
-      return jsonObject;
-    }
-
-    return null;
   }
 }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuditLogsModule } from './audit_logs/audit_logs.module';
 import { AuthModule } from './auth/auth.module';
 import { BlockedHeirsModule } from './blocked_heirs/blocked_heirs.module';
 import { CasesModule } from './cases/cases.module';
@@ -15,6 +16,7 @@ import { UsersModule } from './users/users.module';
     PrismaModule,
     AuthModule,
     UsersModule,
+    AuditLogsModule,
     CasesModule,
     FamilyMembersModule,
     HeirsModule,

@@ -16,6 +16,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { AuthUser } from '../auth/auth-user';
+import { AuditLogsService } from '../audit_logs/audit_logs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { preparePdfText, prepareArabicForPdf } from './pdf-text.util';
 
@@ -334,7 +335,10 @@ type PdfTreeMember = {
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogs: AuditLogsService,
+  ) {}
 
   async findAll(user: AuthUser, caseId?: string) {
     if (caseId) {
@@ -351,7 +355,12 @@ export class ReportsService {
     });
   }
 
-  async generatePdf(caseId: string, user: AuthUser, language: Language) {
+  async generatePdf(
+    caseId: string,
+    user: AuthUser,
+    language: Language,
+    ipAddress?: string,
+  ) {
     await this.assertCanAccessCase(caseId, user);
     const caseData = await this.prisma.case.findUnique({
       where: { id: caseId },
@@ -405,13 +414,12 @@ export class ReportsService {
       },
     });
 
-    await this.prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        caseId,
-        action: 'PDF_REPORT_GENERATED',
-        changes: { reportId: report.id, filePath, language },
-      },
+    await this.auditLogs.record({
+      userId: user.id,
+      caseId,
+      action: 'PDF_REPORT_GENERATED',
+      changes: { reportId: report.id, filePath, language },
+      ipAddress,
     });
 
     return { buffer, report, filename };

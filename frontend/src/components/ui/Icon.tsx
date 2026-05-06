@@ -20,7 +20,8 @@ export type IconName =
   | "edit"
   | "user"
   | "shield"
-  | "download";
+  | "download"
+  | "activity";
 
 const paths: Record<IconName, string[]> = {
   home: ["M3 10.5 12 3l9 7.5", "M5 10v10h14V10", "M9 20v-6h6v6"],
@@ -43,6 +44,7 @@ const paths: Record<IconName, string[]> = {
   user: ["M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2", "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"],
   shield: ["M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"],
   download: ["M12 3v12", "m7 10 5 5 5-5", "M5 21h14"],
+  activity: ["M3 12h4l2-5 4 10 2-5h6", "M3 5h18", "M3 19h18"],
 };
 
 export function Icon({

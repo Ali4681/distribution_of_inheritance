@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Gender, Prisma, RelationType, Role } from '@prisma/client';
 import { AuthUser } from '../auth/auth-user';
+import { AuditLogsService } from '../audit_logs/audit_logs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFamilyMemberDto } from './dto/create-family_member.dto';
 import { UpdateFamilyMemberDto } from './dto/update-family_member.dto';
@@ -166,13 +167,20 @@ type FamilyTreeEdge = {
 
 @Injectable()
 export class FamilyMembersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogs: AuditLogsService,
+  ) {}
 
-  async create(createFamilyMemberDto: CreateFamilyMemberDto, user: AuthUser) {
+  async create(
+    createFamilyMemberDto: CreateFamilyMemberDto,
+    user: AuthUser,
+    ipAddress?: string,
+  ) {
     await this.assertCanAccessCase(createFamilyMemberDto.caseId, user);
     const parentId = await this.resolveParentIdForCreate(createFamilyMemberDto);
 
-    return this.prisma.familyMember.create({
+    const createdMember = await this.prisma.familyMember.create({
       data: {
         caseId: createFamilyMemberDto.caseId,
         parentId,
@@ -188,6 +196,23 @@ export class FamilyMembersService {
       },
       include: familyMemberInclude,
     });
+
+    await this.auditLogs.record({
+      userId: user.id,
+      caseId: createdMember.caseId,
+      action: 'FAMILY_MEMBER_CREATED',
+      changes: {
+        memberId: createdMember.id,
+        fullName: createdMember.fullName,
+        relationType: createdMember.relationType,
+        gender: createdMember.gender,
+        parentId: createdMember.parentId,
+        isAlive: createdMember.isAlive,
+      },
+      ipAddress,
+    });
+
+    return createdMember;
   }
 
   async findAll(user: AuthUser, caseId?: string) {
@@ -253,6 +278,7 @@ export class FamilyMembersService {
     id: string,
     updateFamilyMemberDto: UpdateFamilyMemberDto,
     user: AuthUser,
+    ipAddress?: string,
   ) {
     const member = await this.findOne(id, user);
     const relationType =
@@ -267,7 +293,7 @@ export class FamilyMembersService {
       gender,
     );
 
-    return this.prisma.familyMember.update({
+    const updatedMember = await this.prisma.familyMember.update({
       where: { id },
       data: {
         parentId,
@@ -283,27 +309,59 @@ export class FamilyMembersService {
       },
       include: familyMemberInclude,
     });
+
+    await this.auditLogs.record({
+      userId: user.id,
+      caseId: updatedMember.caseId,
+      action: 'FAMILY_MEMBER_UPDATED',
+      changes: {
+        memberId: updatedMember.id,
+        fullName: updatedMember.fullName,
+        relationType: updatedMember.relationType,
+        gender: updatedMember.gender,
+        parentId: updatedMember.parentId,
+        isAlive: updatedMember.isAlive,
+      },
+      ipAddress,
+    });
+
+    return updatedMember;
   }
 
-  async remove(id: string, user: AuthUser) {
+  async remove(id: string, user: AuthUser, ipAddress?: string) {
     const member = await this.findOne(id, user);
     const heir = await this.prisma.heir.findUnique({
       where: { memberId: member.id },
       select: { id: true },
     });
 
-    const operations: Prisma.PrismaPromise<unknown>[] = [];
-    if (heir) {
-      operations.push(
-        this.prisma.blockedHeir.deleteMany({
+    await this.prisma.$transaction(async (tx) => {
+      if (heir) {
+        await tx.blockedHeir.deleteMany({
           where: { OR: [{ heirId: heir.id }, { blockedById: heir.id }] },
-        }),
-        this.prisma.heir.delete({ where: { id: heir.id } }),
-      );
-    }
+        });
+        await tx.heir.delete({ where: { id: heir.id } });
+      }
 
-    operations.push(this.prisma.familyMember.delete({ where: { id } }));
-    await this.prisma.$transaction(operations);
+      await this.auditLogs.record(
+        {
+          userId: user.id,
+          caseId: member.caseId,
+          action: 'FAMILY_MEMBER_DELETED',
+          changes: {
+            memberId: member.id,
+            fullName: member.fullName,
+            relationType: member.relationType,
+            gender: member.gender,
+            parentId: member.parentId,
+          },
+          ipAddress,
+        },
+        tx,
+      );
+
+      await tx.familyMember.delete({ where: { id } });
+    });
 
     return { status: true, message: 'Family member deleted successfully' };
   }

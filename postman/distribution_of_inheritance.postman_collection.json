@@ -1,0 +1,835 @@
+{
+  "info": {
+    "name": "Distribution Of Inheritance API",
+    "description": "Complete self-contained Postman collection for the NestJS API exposed under /api. This file includes the collection variables needed to run requests without a separate environment file.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api"
+    },
+    {
+      "key": "auth_token",
+      "value": ""
+    },
+    {
+      "key": "user_email",
+      "value": "admin@example.com"
+    },
+    {
+      "key": "user_password",
+      "value": "secret123"
+    },
+    {
+      "key": "user_id",
+      "value": ""
+    },
+    {
+      "key": "user_role",
+      "value": ""
+    },
+    {
+      "key": "target_user_id",
+      "value": ""
+    },
+    {
+      "key": "case_id",
+      "value": ""
+    },
+    {
+      "key": "member_id",
+      "value": ""
+    },
+    {
+      "key": "spouse_member_id",
+      "value": ""
+    },
+    {
+      "key": "heir_id",
+      "value": ""
+    },
+    {
+      "key": "page",
+      "value": "1"
+    },
+    {
+      "key": "limit",
+      "value": "20"
+    },
+    {
+      "key": "language",
+      "value": "AR"
+    },
+    {
+      "key": "usage_note",
+      "value": "Import this collection only. Run Sign Up Admin or Sign In first to populate auth_token, then create a case to populate case_id."
+    }
+  ],
+  "item": [
+    {
+      "name": "App",
+      "item": [
+        {
+          "name": "Root",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}",
+            "description": "Basic API root check."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Sign Up Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 or 200', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const requestData = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
+                  "",
+                  "if (requestData.email) pm.collectionVariables.set('user_email', requestData.email);",
+                  "if (requestData.password) pm.collectionVariables.set('user_password', requestData.password);",
+                  "if (data.token) pm.collectionVariables.set('auth_token', data.token);",
+                  "if (data.user?.id) pm.collectionVariables.set('user_id', data.user.id);",
+                  "if (data.user?.role) pm.collectionVariables.set('user_role', data.user.role);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Admin User\",\n  \"email\": \"admin+{{$timestamp}}@example.com\",\n  \"password\": \"secret123\",\n  \"role\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/auth/signup",
+            "description": "Creates an admin account and stores auth variables from the response."
+          }
+        },
+        {
+          "name": "Sign Up User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 or 200', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const requestData = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
+                  "",
+                  "if (requestData.email) pm.collectionVariables.set('user_email', requestData.email);",
+                  "if (requestData.password) pm.collectionVariables.set('user_password', requestData.password);",
+                  "if (data.token) pm.collectionVariables.set('auth_token', data.token);",
+                  "if (data.user?.id) pm.collectionVariables.set('user_id', data.user.id);",
+                  "if (data.user?.role) pm.collectionVariables.set('user_role', data.user.role);",
+                  "if (data.user?.id && data.user?.role !== 'ADMIN') pm.collectionVariables.set('target_user_id', data.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Regular User\",\n  \"email\": \"user+{{$timestamp}}@example.com\",\n  \"password\": \"secret123\",\n  \"role\": \"USER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/auth/signup",
+            "description": "Creates a regular user. Useful for later admin user-management tests."
+          }
+        },
+        {
+          "name": "Sign In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const requestData = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
+                  "",
+                  "if (requestData.email) pm.collectionVariables.set('user_email', requestData.email);",
+                  "if (requestData.password) pm.collectionVariables.set('user_password', requestData.password);",
+                  "if (data.token) pm.collectionVariables.set('auth_token', data.token);",
+                  "if (data.user?.id) pm.collectionVariables.set('user_id', data.user.id);",
+                  "if (data.user?.role) pm.collectionVariables.set('user_role', data.user.role);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/auth/signin",
+            "description": "Signs in with the current collection variables and refreshes the bearer token."
+          }
+        },
+        {
+          "name": "Edit Current User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Account Name\",\n  \"email\": \"{{user_email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/auth/edit/{{user_id}}",
+            "description": "Updates the currently signed-in account."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "if (data.id) pm.collectionVariables.set('user_id', data.id);",
+                  "if (data.role) pm.collectionVariables.set('user_role', data.role);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/users/me",
+            "description": "Returns the current authenticated user."
+          }
+        },
+        {
+          "name": "List Users (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const users = pm.response.json();",
+                  "if (Array.isArray(users) && users.length) {",
+                  "  const currentId = pm.collectionVariables.get('user_id');",
+                  "  const target = users.find((user) => user.id && user.id !== currentId) || users[0];",
+                  "  if (target?.id) pm.collectionVariables.set('target_user_id', target.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/users",
+            "description": "Admin only. Lists all users and stores a target user id when possible."
+          }
+        },
+        {
+          "name": "Get User By Id (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/users/{{target_user_id}}",
+            "description": "Admin only. Set target_user_id first if needed."
+          }
+        },
+        {
+          "name": "Update User (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Managed User\",\n  \"role\": \"USER\",\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/users/{{target_user_id}}",
+            "description": "Admin only. Updates the target user."
+          }
+        },
+        {
+          "name": "Delete User (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/users/{{target_user_id}}",
+            "description": "Admin only. Deletes the target user."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cases",
+      "item": [
+        {
+          "name": "Create Case",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 or 200', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "if (data.id) pm.collectionVariables.set('case_id', data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deceasedName\": \"Ahmad Abdullah\",\n  \"deathDate\": \"2026-01-15\",\n  \"totalEstate\": 250000,\n  \"currency\": \"SAR\",\n  \"funeralCosts\": 5000,\n  \"debts\": 12000,\n  \"mandatoryWill\": 0,\n  \"optionalWill\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/cases",
+            "description": "Creates an inheritance case and stores case_id."
+          }
+        },
+        {
+          "name": "List Cases",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const cases = pm.response.json();",
+                  "if (Array.isArray(cases) && cases.length && cases[0].id) {",
+                  "  pm.collectionVariables.set('case_id', cases[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/cases",
+            "description": "Lists accessible cases."
+          }
+        },
+        {
+          "name": "Get Case By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/cases/{{case_id}}",
+            "description": "Returns the selected case with family members, heirs, and reports."
+          }
+        },
+        {
+          "name": "Update Case",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deceasedName\": \"Ahmad Abdullah Updated\",\n  \"totalEstate\": 275000,\n  \"debts\": 9000,\n  \"currency\": \"SAR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/cases/{{case_id}}",
+            "description": "Updates the selected case."
+          }
+        },
+        {
+          "name": "Delete Case",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/cases/{{case_id}}",
+            "description": "Deletes the selected case."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Family Members",
+      "item": [
+        {
+          "name": "Create Wife",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 or 200', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "if (data.id) pm.collectionVariables.set('member_id', data.id);",
+                  "if (data.id && ['HUSBAND', 'WIFE'].includes(data.relationType)) {",
+                  "  pm.collectionVariables.set('spouse_member_id', data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"caseId\": \"{{case_id}}\",\n  \"fullName\": \"Fatimah Ahmad\",\n  \"gender\": \"FEMALE\",\n  \"relationType\": \"WIFE\",\n  \"isAlive\": true,\n  \"isMuslim\": true,\n  \"isMurderer\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/family-members",
+            "description": "Creates a spouse record and stores spouse_member_id for child-linking."
+          }
+        },
+        {
+          "name": "Create Son Linked To Spouse",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 or 200', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "if (data.id) pm.collectionVariables.set('member_id', data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"caseId\": \"{{case_id}}\",\n  \"spouseId\": \"{{spouse_member_id}}\",\n  \"fullName\": \"Omar Ahmad\",\n  \"gender\": \"MALE\",\n  \"relationType\": \"SON\",\n  \"isAlive\": true,\n  \"isMuslim\": true,\n  \"isMurderer\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/family-members",
+            "description": "Creates a direct child linked to the stored spouse_member_id."
+          }
+        },
+        {
+          "name": "List Family Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/family-members",
+            "description": "Lists all accessible family members."
+          }
+        },
+        {
+          "name": "List Family Members By Case",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const members = pm.response.json();",
+                  "if (Array.isArray(members) && members.length) {",
+                  "  if (members[0].id) pm.collectionVariables.set('member_id', members[0].id);",
+                  "  const spouse = members.find((member) => ['HUSBAND', 'WIFE'].includes(member.relationType));",
+                  "  if (spouse?.id) pm.collectionVariables.set('spouse_member_id', spouse.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/family-members?caseId={{case_id}}",
+            "description": "Lists family members for the selected case."
+          }
+        },
+        {
+          "name": "Get Family Tree",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/family-members/tree/{{case_id}}",
+            "description": "Returns the computed family tree structure for the case."
+          }
+        },
+        {
+          "name": "Get Family Member By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/family-members/{{member_id}}",
+            "description": "Returns a single family member."
+          }
+        },
+        {
+          "name": "Update Family Member",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Updated Family Member\",\n  \"isAlive\": true,\n  \"isMuslim\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/family-members/{{member_id}}",
+            "description": "Updates the selected family member."
+          }
+        },
+        {
+          "name": "Delete Family Member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/family-members/{{member_id}}",
+            "description": "Deletes the selected family member."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Heirs",
+      "item": [
+        {
+          "name": "Calculate Inheritance By Case",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 or 200', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "if (Array.isArray(data.heirs) && data.heirs.length && data.heirs[0].id) {",
+                  "  pm.collectionVariables.set('heir_id', data.heirs[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/heirs/calculate/{{case_id}}",
+            "description": "Calculates inheritance shares for the selected case."
+          }
+        },
+        {
+          "name": "List Heirs By Case",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "if (Array.isArray(data.heirs) && data.heirs.length && data.heirs[0].id) {",
+                  "  pm.collectionVariables.set('heir_id', data.heirs[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/heirs?caseId={{case_id}}",
+            "description": "Lists calculated heirs for the selected case."
+          }
+        },
+        {
+          "name": "Get Heir By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/heirs/{{heir_id}}",
+            "description": "Returns a single heir record."
+          }
+        },
+        {
+          "name": "Clear Calculated Heirs",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/heirs/case/{{case_id}}",
+            "description": "Deletes calculated heirs and resets the case status to DRAFT."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Blocked Heirs",
+      "item": [
+        {
+          "name": "List All Blocked Heirs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/blocked-heirs",
+            "description": "Lists all blocked heirs accessible to the current user."
+          }
+        },
+        {
+          "name": "List Blocked Heirs By Case",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/blocked-heirs?caseId={{case_id}}",
+            "description": "Lists blocked heirs for the selected case."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "List Reports",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/reports",
+            "description": "Lists accessible reports."
+          }
+        },
+        {
+          "name": "List Reports By Case",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/reports?caseId={{case_id}}",
+            "description": "Lists reports for the selected case."
+          }
+        },
+        {
+          "name": "Generate PDF Report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Content-Type is PDF', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/pdf"
+              }
+            ],
+            "url": "{{base_url}}/reports/cases/{{case_id}}/pdf?language={{language}}",
+            "description": "Generates a PDF report. In Postman, use Send and Download if you want the file saved locally."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit Logs",
+      "item": [
+        {
+          "name": "List Audit Logs (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/audit-logs?page={{page}}&limit={{limit}}",
+            "description": "Admin only. Returns paginated audit logs."
+          }
+        },
+        {
+          "name": "Filter Audit Logs By Case (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/audit-logs?page={{page}}&limit={{limit}}&action=CASE_CREATED&caseId={{case_id}}&hasCase=true",
+            "description": "Admin only. Example filtered audit-log request using caseId and action."
+          }
+        }
+      ]
+    }
+  ]
+}

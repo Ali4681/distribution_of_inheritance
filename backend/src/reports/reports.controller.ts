@@ -11,6 +11,7 @@ import {
 import { Language } from '@prisma/client';
 import type { Request, Response } from 'express';
 import { AuthUser } from '../auth/auth-user';
+import { getRequestIp } from '../common/request-ip';
 import { JwtAuthGuard } from '../auth/guard/jwt.guard';
 import { ReportsService } from './reports.service';
 
@@ -38,6 +39,7 @@ export class ReportsController {
       caseId,
       request.user,
       language,
+      getRequestIp(request),
     );
 
     response.setHeader('Content-Type', 'application/pdf');

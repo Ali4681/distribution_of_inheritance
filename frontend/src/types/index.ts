@@ -6,3 +6,4 @@ export * from "./family-member.types";
 export * from "./blocked-heir.types";
 export * from "./heir.types";
 export * from "./report.types";
+export * from "./audit-log.types";

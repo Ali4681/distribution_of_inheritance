@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthUser } from '../auth/auth-user';
+import { getRequestIp } from '../common/request-ip';
 import { JwtAuthGuard } from '../auth/guard/jwt.guard';
 import { CasesService } from './cases.service';
 import { CreateCaseDto } from './dto/create-case.dto';
@@ -26,7 +27,11 @@ export class CasesController {
     @Body() createCaseDto: CreateCaseDto,
     @Req() request: Request & { user: AuthUser },
   ) {
-    return this.casesService.create(createCaseDto, request.user);
+    return this.casesService.create(
+      createCaseDto,
+      request.user,
+      getRequestIp(request),
+    );
   }
 
   @Get()
@@ -48,7 +53,12 @@ export class CasesController {
     @Body() updateCaseDto: UpdateCaseDto,
     @Req() request: Request & { user: AuthUser },
   ) {
-    return this.casesService.update(id, updateCaseDto, request.user);
+    return this.casesService.update(
+      id,
+      updateCaseDto,
+      request.user,
+      getRequestIp(request),
+    );
   }
 
   @Delete(':id')
@@ -56,6 +66,6 @@ export class CasesController {
     @Param('id') id: string,
     @Req() request: Request & { user: AuthUser },
   ) {
-    return this.casesService.remove(id, request.user);
+    return this.casesService.remove(id, request.user, getRequestIp(request));
   }
 }

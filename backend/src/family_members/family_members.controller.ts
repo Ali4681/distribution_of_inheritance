@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthUser } from '../auth/auth-user';
+import { getRequestIp } from '../common/request-ip';
 import { JwtAuthGuard } from '../auth/guard/jwt.guard';
 import { CreateFamilyMemberDto } from './dto/create-family_member.dto';
 import { UpdateFamilyMemberDto } from './dto/update-family_member.dto';
@@ -30,6 +31,7 @@ export class FamilyMembersController {
     return this.familyMembersService.create(
       createFamilyMemberDto,
       request.user,
+      getRequestIp(request),
     );
   }
 
@@ -67,6 +69,7 @@ export class FamilyMembersController {
       id,
       updateFamilyMemberDto,
       request.user,
+      getRequestIp(request),
     );
   }
 
@@ -75,6 +78,10 @@ export class FamilyMembersController {
     @Param('id') id: string,
     @Req() request: Request & { user: AuthUser },
   ) {
-    return this.familyMembersService.remove(id, request.user);
+    return this.familyMembersService.remove(
+      id,
+      request.user,
+      getRequestIp(request),
+    );
   }
 }
