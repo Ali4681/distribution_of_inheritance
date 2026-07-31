@@ -14,7 +14,7 @@ import type { FamilyTreeNode, FamilyTreeResponse } from "@/types";
 import { useApp } from "@/components/providers/AppProvider";
 import { buildFlowTree, TreeFlowNodeData } from "@/utils/tree-layout";
 import { relationLabel, relationTone } from "@/utils/relation-map";
-import { formatMoney, percentage } from "@/utils/format";
+import { formatMoney, formatNumber, percentage } from "@/utils/format";
 
 const nodeTypes = {
   deceasedTreeNode: DeceasedTreeNode,
@@ -26,16 +26,18 @@ export default function FamilyTree({
   tree,
   selectedId,
   onSelect,
+  totalPropertyShares = 0,
 }: {
   tree: FamilyTreeResponse | null;
   selectedId?: string;
   onSelect?: (node: FamilyTreeNode) => void;
+  totalPropertyShares?: number;
 }) {
   const { t, locale } = useApp();
   const flow = useMemo(() => {
     if (!tree) return { nodes: [], edges: [] };
-    return buildFlowTree(tree, locale, selectedId);
-  }, [locale, selectedId, tree]);
+    return buildFlowTree(tree, locale, selectedId, totalPropertyShares);
+  }, [locale, selectedId, totalPropertyShares, tree]);
 
   if (!tree || tree.nodes.length <= 1) {
     return (
@@ -147,6 +149,18 @@ function MemberTreeNode({ data }: { data: TreeFlowNodeData }) {
               <p className="text-[var(--muted)]">{t.amount}</p>
               <p className="font-black">
                 {formatMoney(heir.monetaryValue, "", locale)}
+              </p>
+            </div>
+            <div className="col-span-2 flex items-center justify-between gap-2 rounded-md bg-[var(--surface-2)] px-2 py-1.5">
+              <p className="text-[var(--muted)]">
+                {locale === "ar" ? "الأسهم" : "Property shares"}
+              </p>
+              <p className="font-black text-[var(--primary)]">
+                {formatNumber(
+                  Number(data.totalPropertyShares ?? 0) *
+                    (Number(heir.sharePercentage ?? 0) / 100),
+                )}{" "}
+                {locale === "ar" ? "سهم" : "shares"}
               </p>
             </div>
             <div className="col-span-2">

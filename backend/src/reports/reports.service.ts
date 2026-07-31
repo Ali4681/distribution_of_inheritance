@@ -21,6 +21,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { preparePdfText, prepareArabicForPdf } from './pdf-text.util';
 
 const reportCaseInclude = {
+  properties: {
+    orderBy: { createdAt: 'asc' },
+  },
   familyMembers: {
     include: { parent: true },
     orderBy: [{ relationType: 'asc' }, { fullName: 'asc' }],
@@ -484,6 +487,12 @@ export class ReportsService {
     doc.addPage();
     doc.y = doc.page.margins.top;
     this.drawEligibleHeirs(doc, caseData, labels, language);
+
+    if (caseData.properties.length > 0) {
+      doc.addPage();
+      doc.y = doc.page.margins.top;
+      this.drawPropertyShares(doc, caseData, labels, language);
+    }
 
     doc.addPage();
     doc.y = doc.page.margins.top;
@@ -1113,6 +1122,63 @@ export class ReportsService {
     }
   }
 
+  private drawPropertyShares(
+    doc: PDFKit.PDFDocument,
+    caseData: ReportCaseData,
+    labels: ReportLabels,
+    language: Language,
+  ) {
+    const rtl = language === Language.AR;
+    const eligible = caseData.heirs.filter((heir) => heir.isEligible);
+    const rows = caseData.properties.flatMap((property) =>
+      eligible.map((heir) => ({ property, heir })),
+    );
+
+    this.sectionTitle(doc, labels.propertyShares, rtl);
+    this.drawTable(
+      doc,
+      [
+        {
+          label: labels.property,
+          width: 125,
+          value: (row) => row.property.name,
+          align: rtl ? 'right' : 'left',
+        },
+        {
+          label: labels.name,
+          width: 120,
+          value: (row) => row.heir.member.fullName,
+          align: rtl ? 'right' : 'left',
+        },
+        {
+          label: labels.share,
+          width: 65,
+          value: (row) => row.heir.shareFraction ?? '0',
+          align: 'center',
+        },
+        {
+          label: labels.percentage,
+          width: 80,
+          value: (row) => `${Number(row.heir.sharePercentage ?? 0).toFixed(4)}%`,
+          align: 'center',
+        },
+        {
+          label: labels.propertyShareCount,
+          width: 115,
+          value: (row) =>
+            `${(
+              Number(row.property.totalShares) *
+              (Number(row.heir.sharePercentage ?? 0) / 100)
+            ).toFixed(4)} / ${row.property.totalShares}`,
+          align: rtl ? 'left' : 'right',
+        },
+      ],
+      rows,
+      labels,
+      rtl,
+    );
+  }
+
   private drawBlockedHeirs(
     doc: PDFKit.PDFDocument,
     caseData: ReportCaseData,
@@ -1627,6 +1693,9 @@ export class ReportsService {
         amount: 'المبلغ',
         familyMembers: 'أفراد العائلة',
         eligibleHeirs: 'الورثة المستحقون',
+        propertyShares: 'أسهم ملكية العقارات',
+        property: 'العقار',
+        propertyShareCount: 'أسهم الوارث / إجمالي الأسهم',
         blockedHeirs: 'الورثة المحجوبون',
         legalBasisDetails: 'تفاصيل الأساس القانوني',
         legalNotes: 'ملاحظات قانونية وتشغيلية',
@@ -1711,6 +1780,9 @@ export class ReportsService {
       amount: 'Amount',
       familyMembers: 'Family members',
       eligibleHeirs: 'Eligible heirs',
+      propertyShares: 'Property ownership shares',
+      property: 'Property',
+      propertyShareCount: 'Heir shares / total shares',
       blockedHeirs: 'Blocked heirs',
       legalBasisDetails: 'Legal basis details',
       legalNotes: 'Legal and operational notes',

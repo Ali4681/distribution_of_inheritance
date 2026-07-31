@@ -118,8 +118,23 @@ model Case {
   heirs         Heir[]
   reports       Report[]
   auditLogs     AuditLog[]
+  properties    Property[]
 
   @@map("cases")
+}
+
+model Property {
+  id             String   @id @default(uuid())
+  caseId         String   @map("case_id")
+  name           String
+  description    String?
+  totalShares    Int      @default(2400) @map("total_shares")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("properties")
 }
 
 // ─────────────────────────────────────────

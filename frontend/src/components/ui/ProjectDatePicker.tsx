@@ -238,6 +238,24 @@ export function ProjectDatePicker({
     );
   }, [tag]);
 
+  const monthOptions = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(tag, { month: "long" });
+    return Array.from({ length: 12 }, (_, month) => ({
+      value: month,
+      label: formatter.format(new Date(2026, month, 1, 12)),
+    }));
+  }, [tag]);
+
+  const yearOptions = useMemo(() => {
+    const currentYear = today.getFullYear();
+    const firstYear = Math.min(currentYear - 130, viewMonth.getFullYear());
+    const lastYear = currentYear;
+    return Array.from(
+      { length: lastYear - firstYear + 1 },
+      (_, index) => lastYear - index,
+    );
+  }, [today, viewMonth]);
+
   const cells = useMemo<CalendarCell[]>(() => {
     const monthStart = startOfMonth(viewMonth);
     const gridStart = new Date(
@@ -275,19 +293,15 @@ export function ProjectDatePicker({
   function togglePicker() {
     if (disabled) return;
 
-    setIsOpen((current) => {
-      const next = !current;
+    if (isOpen) {
+      closePicker();
+      return;
+    }
 
-      if (next) {
-        setPopoverStyle(null);
-        setViewMonth(startOfMonth(selectedDate ?? today));
-        onOpen?.();
-      } else {
-        onClose?.();
-      }
-
-      return next;
-    });
+    setPopoverStyle(null);
+    setViewMonth(startOfMonth(selectedDate ?? today));
+    setIsOpen(true);
+    onOpen?.();
   }
 
   function selectDate(iso: string) {
@@ -299,6 +313,16 @@ export function ProjectDatePicker({
     setViewMonth((current) =>
       new Date(current.getFullYear(), current.getMonth() + offset, 1, 12),
     );
+  }
+
+  function selectMonth(month: number) {
+    setViewMonth(
+      (current) => new Date(current.getFullYear(), month, 1, 12),
+    );
+  }
+
+  function selectYear(year: number) {
+    setViewMonth((current) => new Date(year, current.getMonth(), 1, 12));
   }
 
   function clearValue() {
@@ -375,7 +399,32 @@ export function ProjectDatePicker({
 
               <div className="pdp-head-copy">
                 <span className="pdp-head-kicker">{label}</span>
-                <strong className="pdp-head-title">{monthLabel}</strong>
+                <div className="pdp-head-selects">
+                  <select
+                    className="pdp-head-select"
+                    aria-label={locale === "ar" ? "اختر الشهر" : "Choose month"}
+                    value={viewMonth.getMonth()}
+                    onChange={(event) => selectMonth(Number(event.target.value))}
+                  >
+                    {monthOptions.map((month) => (
+                      <option key={month.value} value={month.value}>
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="pdp-head-select pdp-head-select--year"
+                    aria-label={locale === "ar" ? "اختر السنة" : "Choose year"}
+                    value={viewMonth.getFullYear()}
+                    onChange={(event) => selectYear(Number(event.target.value))}
+                  >
+                    {yearOptions.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <button
@@ -383,6 +432,10 @@ export function ProjectDatePicker({
                 className="pdp-nav"
                 onClick={() => goToMonth(1)}
                 aria-label={copy.nextMonth}
+                disabled={
+                  viewMonth.getFullYear() >= today.getFullYear() &&
+                  viewMonth.getMonth() === 11
+                }
               >
                 {locale === "ar" ? "<" : ">"}
               </button>

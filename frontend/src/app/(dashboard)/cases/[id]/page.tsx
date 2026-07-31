@@ -11,7 +11,7 @@ import { useApp } from "@/components/providers/AppProvider";
 import { useDialog } from "@/components/providers/DialogProvider";
 import type { AsyncResult } from "@/lib";
 import type { Locale } from "@/lib/i18n";
-import { useCase } from "@/hooks/use-cases";
+import { useCase, useUpdateCase } from "@/hooks/use-cases";
 import {
   useCreateFamilyMember,
   useDeleteFamilyMember,
@@ -22,6 +22,8 @@ import { useCalculateHeirs, useHeirs } from "@/hooks/use-heirs";
 import { useGeneratePdf, useReports } from "@/hooks/use-reports";
 import {
   CreateFamilyMemberDto,
+  CreateEstatePropertyDto,
+  EstateProperty,
   FamilyTreeMember,
   FamilyTreeNode,
   Gender,
@@ -37,6 +39,7 @@ import {
   relationLabel,
   RELATION_GROUPS,
 } from "@/utils/relation-map";
+import { legalText } from "@/utils/legal-text";
 import {
   formatDate,
   formatMoney,
@@ -45,7 +48,7 @@ import {
 } from "@/utils/format";
 import { caseStatusLabel, languageLabel } from "@/utils/labels";
 
-type Tab = "family" | "results" | "reports";
+type Tab = "family" | "properties" | "results" | "reports";
 
 type RelativeFormState = {
   id?: string;
@@ -107,6 +110,7 @@ export default function CaseDetailsPage() {
   const { deleteMember, loading: deleting } = useDeleteFamilyMember();
   const { calculate, loading: calculating } = useCalculateHeirs();
   const { generatePdf, loading: generatingPdf } = useGeneratePdf();
+  const { updateCase, loading: savingProperties } = useUpdateCase(caseId);
 
   const inheritanceCase = caseQuery.data;
   const tree = treeQuery.data;
@@ -134,6 +138,15 @@ export default function CaseDetailsPage() {
         Number(inheritanceCase.optionalWill ?? 0),
     );
   }, [inheritanceCase]);
+
+  const totalPropertyShares = useMemo(
+    () =>
+      (inheritanceCase?.properties ?? []).reduce(
+        (total, property) => total + Number(property.totalShares ?? 0),
+        0,
+      ),
+    [inheritanceCase],
+  );
 
   function refetchAll() {
     caseQuery.refetch();
@@ -303,6 +316,7 @@ export default function CaseDetailsPage() {
 
   const tabIcons: Record<Tab, string> = {
     family: "⬡",
+    properties: "⌂",
     results: "◎",
     reports: "◈",
   };
@@ -375,6 +389,14 @@ export default function CaseDetailsPage() {
             accent: false,
           },
           {
+            label:
+              locale === "ar" ? "إجمالي أسهم العقارات" : "Total property shares",
+            value: `${formatNumber(totalPropertyShares)} ${
+              locale === "ar" ? "سهم" : "shares"
+            }`,
+            accent: false,
+          },
+          {
             label: t.funeralCosts,
             value: formatMoney(
               inheritanceCase.funeralCosts,
@@ -422,7 +444,7 @@ export default function CaseDetailsPage() {
 
       {/* ── Tab bar ── */}
       <div className={`cd-tabbar no-print ${mounted ? "cd-tabbar--in" : ""}`}>
-        {(["family", "results", "reports"] as Tab[]).map((item) => (
+        {(["family", "properties", "results", "reports"] as Tab[]).map((item) => (
           <button
             key={item}
             type="button"
@@ -433,6 +455,10 @@ export default function CaseDetailsPage() {
             <span>
               {item === "family"
                 ? t.family
+                : item === "properties"
+                  ? locale === "ar"
+                    ? "العقارات"
+                    : "Real estate"
                 : item === "results"
                   ? t.results
                   : t.reports}
@@ -475,6 +501,7 @@ export default function CaseDetailsPage() {
                 tree={tree ?? null}
                 selectedId={selectedNode?.id}
                 onSelect={selectTreeNode}
+                totalPropertyShares={totalPropertyShares}
               />
             </div>
           </div>
@@ -485,6 +512,30 @@ export default function CaseDetailsPage() {
             eligibleHeirs={eligibleHeirs}
             blockedHeirs={blockedHeirs}
             currency={inheritanceCase.currency}
+            properties={inheritanceCase.properties ?? []}
+          />
+        )}
+
+        {tab === "properties" && (
+          <PropertyEditor
+            key={(inheritanceCase.properties ?? [])
+              .map((property) => property.id)
+              .join(":")}
+            properties={inheritanceCase.properties ?? []}
+            saving={savingProperties}
+            onSave={async (properties) => {
+              try {
+                await updateCase({ properties });
+                toast.success(
+                  locale === "ar" ? "تم حفظ العقارات." : "Properties saved.",
+                );
+                caseQuery.refetch();
+              } catch (error) {
+                toast.error(
+                  error instanceof Error ? error.message : t.deleteFailed,
+                );
+              }
+            }}
           />
         )}
 
@@ -724,7 +775,12 @@ export default function CaseDetailsPage() {
         }
         @media (min-width: 768px) {
           .cd-estate-grid {
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        @media (min-width: 1280px) {
+          .cd-estate-grid {
+            grid-template-columns: repeat(6, 1fr);
           }
         }
         .cd-estate-grid--in {
@@ -1462,17 +1518,195 @@ function RelativePanel({
   );
 }
 
+function PropertyEditor({
+  properties,
+  saving,
+  onSave,
+}: {
+  properties: EstateProperty[];
+  saving: boolean;
+  onSave: (properties: CreateEstatePropertyDto[]) => Promise<void>;
+}) {
+  const { locale, t } = useApp();
+  const labels =
+    locale === "ar"
+      ? {
+          title: "إدارة العقارات",
+          hint: "أضف العقارات ليتم توزيع ملكية كل عقار كأسهم بين الورثة.",
+          add: "إضافة عقار",
+          remove: "حذف",
+          propertyName: "اسم العقار",
+          description: "الوصف أو بيانات السجل",
+          value: "عدد الأسهم",
+        }
+      : {
+          title: "Manage real estate",
+          hint: "Add properties to divide each property's ownership into shares among the heirs.",
+          add: "Add property",
+          remove: "Remove",
+          propertyName: "Property name",
+          description: "Description or registry details",
+          value: "Total shares",
+        };
+  const [items, setItems] = useState(
+    properties.map((property) => ({
+      name: property.name,
+      description: property.description ?? "",
+      totalShares: String(property.totalShares ?? 2400),
+    })),
+  );
+
+  return (
+    <section className="pe-panel">
+      <div className="pe-header">
+        <div>
+          <h3>{labels.title}</h3>
+          <p>{labels.hint}</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() =>
+            setItems((current) => [
+              ...current,
+              { name: "", description: "", totalShares: "2400" },
+            ])
+          }
+        >
+          + {labels.add}
+        </button>
+      </div>
+      <div className="pe-list">
+        {items.map((item, index) => (
+          <div className="pe-card" key={index}>
+            <input
+              className="input"
+              aria-label={labels.propertyName}
+              placeholder={labels.propertyName}
+              value={item.name}
+              onChange={(event) =>
+                setItems((current) =>
+                  current.map((property, itemIndex) =>
+                    itemIndex === index
+                      ? { ...property, name: event.target.value }
+                      : property,
+                  ),
+                )
+              }
+            />
+            <input
+              className="input"
+              aria-label={labels.description}
+              placeholder={labels.description}
+              value={item.description}
+              onChange={(event) =>
+                setItems((current) =>
+                  current.map((property, itemIndex) =>
+                    itemIndex === index
+                      ? { ...property, description: event.target.value }
+                      : property,
+                  ),
+                )
+              }
+            />
+            <div className="pe-value">
+              <input
+                className="input"
+                type="number"
+                min="1"
+                step="1"
+                aria-label={labels.value}
+                placeholder={labels.value}
+                value={item.totalShares}
+                onChange={(event) =>
+                  setItems((current) =>
+                    current.map((property, itemIndex) =>
+                      itemIndex === index
+                        ? { ...property, totalShares: event.target.value }
+                        : property,
+                    ),
+                  )
+                }
+              />
+              <span>{locale === "ar" ? "سهم" : "shares"}</span>
+            </div>
+            <button
+              type="button"
+              className="pe-remove"
+              onClick={() =>
+                setItems((current) =>
+                  current.filter((_, itemIndex) => itemIndex !== index),
+                )
+              }
+            >
+              {labels.remove}
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="btn btn-primary pe-save"
+        disabled={saving}
+        onClick={() =>
+          onSave(
+            items
+              .filter((item) => item.name.trim())
+              .map((item) => ({
+                name: item.name.trim(),
+                description: item.description.trim() || undefined,
+                totalShares: Number(item.totalShares || 2400),
+              })),
+          )
+        }
+      >
+        {saving ? t.loading : t.save}
+      </button>
+      <style jsx global>{`
+        .pe-panel { display: grid; gap: 18px; padding: 22px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); }
+        .pe-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+        .pe-header h3 { margin: 0 0 6px; font-size: 19px; }
+        .pe-header p { margin: 0; color: var(--muted); font-size: 12px; }
+        .pe-list { display: grid; gap: 10px; }
+        .pe-card { display: grid; grid-template-columns: 1fr 1.3fr 0.8fr auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
+        .pe-value { position: relative; }
+        .pe-value .input { padding-inline-end: 48px; }
+        .pe-value span { position: absolute; inset-inline-end: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 10px; }
+        .pe-remove { border: 0; background: transparent; color: var(--danger); cursor: pointer; font: inherit; font-size: 11px; }
+        .pe-save { justify-self: end; }
+        @media (max-width: 800px) { .pe-card { grid-template-columns: 1fr; } .pe-header { flex-direction: column; } }
+      `}</style>
+    </section>
+  );
+}
+
 /* ── Results Section ── */
 function ResultsSection({
   eligibleHeirs,
   blockedHeirs,
   currency,
+  properties,
 }: {
   eligibleHeirs: Heir[];
   blockedHeirs: Heir[];
   currency: string;
+  properties: EstateProperty[];
 }) {
   const { t, locale } = useApp();
+  const propertyText =
+    locale === "ar"
+      ? {
+          title: "أسهم ملكية العقارات",
+          hint: "يُقسّم كل عقار بين الورثة المستحقين وفق الكسر الشرعي المحسوب.",
+          total: "إجمالي أسهم العقار",
+          unit: "سهم",
+        }
+      : {
+          title: "Property ownership shares",
+          hint: "Each property is divided among eligible heirs using the calculated inheritance fraction.",
+          total: "Total property shares",
+          unit: "shares",
+        };
 
   if (!eligibleHeirs.length && !blockedHeirs.length) {
     return (
@@ -1561,6 +1795,51 @@ function ResultsSection({
         </div>
       </section>
 
+      {properties.length > 0 && (
+        <section className="rs-panel rs-properties-panel">
+          <div className="rs-panel-header">
+            <div className="rs-panel-icon rs-panel-icon--property">⌂</div>
+            <div>
+              <h3 className="rs-panel-title">{propertyText.title}</h3>
+              <p className="rs-panel-count">{propertyText.hint}</p>
+            </div>
+          </div>
+          <div className="rs-properties-list">
+            {properties.map((property) => (
+              <article className="rs-property-card" key={property.id}>
+                <div className="rs-property-heading">
+                  <div>
+                    <h4>{property.name}</h4>
+                    {property.description && <p>{property.description}</p>}
+                  </div>
+                  <span className="rs-property-value">
+                    {propertyText.total}: {formatNumber(property.totalShares)} {propertyText.unit}
+                  </span>
+                </div>
+                <div className="rs-property-shares">
+                  {eligibleHeirs.map((heir) => (
+                    <div className="rs-property-share" key={heir.id}>
+                      <span className="rs-property-heir">{heir.member.fullName}</span>
+                      <strong>{heir.shareFraction ?? "0"}</strong>
+                      <span>{percentage(heir.sharePercentage)}</span>
+                      <small>
+                        {new Intl.NumberFormat("en-US-u-nu-latn", {
+                          maximumFractionDigits: 4,
+                        }).format(
+                          Number(property.totalShares) *
+                            (Number(heir.sharePercentage ?? 0) / 100),
+                        )}{" "}
+                        {propertyText.unit}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Blocked */}
       <section className="rs-panel rs-panel--blocked">
         <div className="rs-panel-header">
@@ -1586,7 +1865,9 @@ function ResultsSection({
                     {relationLabel(heir.member.relationType, locale)}
                   </span>
                 </div>
-                <p className="rs-blocked-basis">{heir.legalBasis}</p>
+                <p className="rs-blocked-basis">
+                  {legalText(heir.legalBasis, locale)}
+                </p>
                 {heir.blockedBy?.map((block) => (
                   <p key={block.id} className="rs-blocked-by">
                     <span aria-hidden="true">
@@ -1622,6 +1903,18 @@ function ResultsSection({
           overflow: hidden;
           font-family: "Syne", sans-serif;
         }
+        .rs-properties-panel { grid-column: 1 / -1; }
+        .rs-panel-icon--property { color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+        .rs-properties-list { display: grid; gap: 14px; padding: 18px; }
+        .rs-property-card { border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+        .rs-property-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 14px; }
+        .rs-property-heading h4 { margin: 0; font-size: 16px; }
+        .rs-property-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+        .rs-property-value { font-family: "DM Mono", monospace; font-size: 11px; color: var(--primary); }
+        .rs-property-shares { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+        .rs-property-share { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2, #eef1f4); font-size: 12px; }
+        .rs-property-share strong { color: var(--primary); font-family: "DM Mono", monospace; }
+        .rs-property-share > span:not(.rs-property-heir), .rs-property-share small { color: var(--muted); font-family: "DM Mono", monospace; }
         .rs-panel-header {
           display: flex;
           align-items: center;

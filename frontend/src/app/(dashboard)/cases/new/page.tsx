@@ -1,6 +1,12 @@
 "use client";
 
-import { FormEvent, useState, useSyncExternalStore } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Icon } from "@/components/ui/Icon";
@@ -34,6 +40,31 @@ export default function NewCasePage() {
   const { createCase, loading } = useCreateCase();
   const mounted = useIsClient();
   const [focused, setFocused] = useState<string | null>(null);
+  const [currencyOpen, setCurrencyOpen] = useState(false);
+  const currencyMenuRef = useRef<HTMLDivElement | null>(null);
+  const propertyText =
+    locale === "ar"
+      ? {
+          section: "العقارات",
+          add: "إضافة عقار",
+          remove: "حذف العقار",
+          name: "اسم العقار",
+          namePlaceholder: "مثال: منزل في دمشق",
+          description: "الوصف أو بيانات السجل العقاري",
+          value: "عدد الأسهم",
+        }
+      : {
+          section: "Real estate",
+          add: "Add property",
+          remove: "Remove property",
+          name: "Property name",
+          namePlaceholder: "Example: House in Damascus",
+          description: "Description or registry details",
+          value: "Total shares",
+        };
+  const [properties, setProperties] = useState([
+    { name: "", description: "", totalShares: "2400" },
+  ]);
   const [form, setForm] = useState({
     deceasedName: "",
     deathDate: new Date().toISOString().slice(0, 10),
@@ -44,6 +75,31 @@ export default function NewCasePage() {
     mandatoryWill: "0",
     optionalWill: "0",
   });
+
+  useEffect(() => {
+    if (!currencyOpen) return;
+
+    function closeCurrencyMenu(event: PointerEvent) {
+      if (!currencyMenuRef.current?.contains(event.target as Node)) {
+        setCurrencyOpen(false);
+        setFocused(null);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setCurrencyOpen(false);
+        setFocused(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeCurrencyMenu);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeCurrencyMenu);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [currencyOpen]);
 
   function update(key: keyof typeof form, value: string) {
     setForm((c) => ({ ...c, [key]: value }));
@@ -61,6 +117,13 @@ export default function NewCasePage() {
         debts: Number(form.debts || 0),
         mandatoryWill: Number(form.mandatoryWill || 0),
         optionalWill: Number(form.optionalWill || 0),
+        properties: properties
+          .filter((property) => property.name.trim())
+          .map((property) => ({
+            name: property.name.trim(),
+            description: property.description.trim() || undefined,
+            totalShares: Number(property.totalShares || 2400),
+          })),
       });
       toast.success(t.caseCreated);
       router.push(`/cases/${created.id}`);
@@ -180,28 +243,61 @@ export default function NewCasePage() {
                   <span className="nc-label-glyph">◎</span>
                   {t.currency}
                 </label>
-                <div className="nc-input-wrap">
-                  <select
+                <div className="nc-input-wrap nc-currency-select" ref={currencyMenuRef}>
+                  <button
                     id="nc-currency"
-                    className="nc-input nc-input--mono nc-select"
-                    value={form.currency}
-                    onChange={(e) => update("currency", e.target.value)}
-                    onFocus={() => setFocused("currency")}
-                    onBlur={() => setFocused(null)}
-                    required
+                    type="button"
+                    className="nc-input nc-input--mono nc-select-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded={currencyOpen}
+                    onClick={() => {
+                      setCurrencyOpen((current) => !current);
+                      setFocused("currency");
+                    }}
                   >
-                    {currencyOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {locale === "ar"
-                          ? `${option.label.ar} (${option.value})`
-                          : `${option.label.en} (${option.value})`}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="nc-select-arrow" aria-hidden="true">
-                    v
-                  </span>
+                    <span>
+                      {locale === "ar"
+                        ? currencyOptions.find((option) => option.value === form.currency)?.label.ar
+                        : currencyOptions.find((option) => option.value === form.currency)?.label.en}
+                    </span>
+                    <strong>{form.currency}</strong>
+                    <span
+                      className={`nc-select-chevron ${currencyOpen ? "is-open" : ""}`}
+                      aria-hidden="true"
+                    >
+                      ⌄
+                    </span>
+                  </button>
                   <span className="nc-line" />
+                  {currencyOpen && (
+                    <div className="nc-currency-menu" role="listbox">
+                      {currencyOptions.map((option) => {
+                        const selected = option.value === form.currency;
+                        return (
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            className={`nc-currency-option ${selected ? "is-selected" : ""}`}
+                            key={option.value}
+                            onClick={() => {
+                              update("currency", option.value);
+                              setCurrencyOpen(false);
+                              setFocused(null);
+                            }}
+                          >
+                            <span className="nc-currency-code">{option.value}</span>
+                            <span className="nc-currency-name">
+                              {locale === "ar" ? option.label.ar : option.label.en}
+                            </span>
+                            <span className="nc-currency-check" aria-hidden="true">
+                              {selected ? "✓" : ""}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -244,6 +340,110 @@ export default function NewCasePage() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="nc-divider">
+              <span>{propertyText.section}</span>
+            </div>
+
+            <div className="nc-properties">
+              {properties.map((property, index) => (
+                <div className="nc-property" key={index}>
+                  <div className="nc-property-head">
+                    <strong>{`${propertyText.section} ${index + 1}`}</strong>
+                    {properties.length > 1 && (
+                      <button
+                        type="button"
+                        className="nc-property-remove"
+                        onClick={() =>
+                          setProperties((current) =>
+                            current.filter((_, itemIndex) => itemIndex !== index),
+                          )
+                        }
+                      >
+                        {propertyText.remove}
+                      </button>
+                    )}
+                  </div>
+                  <div className="nc-row">
+                    <div className="nc-field">
+                      <label className="nc-label" htmlFor={`property-name-${index}`}>
+                        {propertyText.name}
+                      </label>
+                      <input
+                        id={`property-name-${index}`}
+                        className="nc-input"
+                        value={property.name}
+                        placeholder={propertyText.namePlaceholder}
+                        onChange={(event) =>
+                          setProperties((current) =>
+                            current.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? { ...item, name: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="nc-field">
+                      <label className="nc-label" htmlFor={`property-shares-${index}`}>
+                        {propertyText.value}
+                      </label>
+                      <div className="nc-input-wrap nc-input-wrap--money">
+                        <input
+                          id={`property-shares-${index}`}
+                          className="nc-input nc-input--money"
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={property.totalShares}
+                          onChange={(event) =>
+                            setProperties((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, totalShares: event.target.value }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="nc-field">
+                    <label className="nc-label" htmlFor={`property-description-${index}`}>
+                      {propertyText.description}
+                    </label>
+                    <input
+                      id={`property-description-${index}`}
+                      className="nc-input"
+                      value={property.description}
+                      onChange={(event) =>
+                        setProperties((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, description: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="nc-property-add"
+                onClick={() =>
+                  setProperties((current) => [
+                    ...current,
+                    { name: "", description: "", totalShares: "2400" },
+                  ])
+                }
+              >
+                + {propertyText.add}
+              </button>
             </div>
 
             {/* Submit */}
@@ -500,11 +700,45 @@ export default function NewCasePage() {
         }
 
         .nc-field {
+          position: relative;
+          z-index: 1;
           display: flex;
           flex-direction: column;
           gap: 8px;
           animation: field-in 0.5s ease calc(var(--fi, 0) * 60ms + 200ms) both;
         }
+        .nc-field--focused {
+          z-index: 120;
+        }
+        .nc-properties { display: grid; gap: 14px; }
+        .nc-property {
+          display: grid;
+          gap: 16px;
+          padding: 18px;
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          background: color-mix(in srgb, var(--surface-2, #eef1f4) 45%, var(--surface));
+        }
+        .nc-property-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .nc-property-head strong { font-size: 13px; color: var(--text); }
+        .nc-property-remove, .nc-property-add {
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          background: var(--surface);
+          color: var(--muted);
+          padding: 8px 12px;
+          font: inherit;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .nc-property-remove { color: var(--danger); }
+        .nc-property-add { justify-self: start; color: var(--primary); }
         @keyframes field-in {
           from {
             opacity: 0;
@@ -582,23 +816,102 @@ export default function NewCasePage() {
         .nc-input::placeholder {
           color: color-mix(in srgb, var(--muted) 50%, transparent);
         }
-        .nc-select {
-          appearance: none;
+        .nc-currency-select {
+          position: relative;
+        }
+        .nc-select-trigger {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto auto;
+          align-items: center;
+          gap: 10px;
+          padding-inline: 4px;
+          text-align: start;
           cursor: pointer;
-          padding-inline-end: 28px;
         }
-        .nc-select-arrow {
-          position: absolute;
-          inset-inline-end: 6px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--muted);
-          font-size: 18px;
-          pointer-events: none;
-          transition: color 0.2s ease;
+        .nc-select-trigger > span:first-child {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-family: "Syne", sans-serif;
+          letter-spacing: 0;
         }
-        .nc-field--focused .nc-select-arrow {
+        .nc-select-trigger strong {
           color: var(--primary);
+          font-size: 12px;
+          letter-spacing: 0.08em;
+        }
+        .nc-select-chevron {
+          color: var(--muted);
+          font-size: 20px;
+          line-height: 1;
+          transition: transform 0.2s ease, color 0.2s ease;
+        }
+        .nc-select-chevron.is-open {
+          transform: rotate(180deg);
+          color: var(--primary);
+        }
+        .nc-currency-menu {
+          position: absolute;
+          z-index: 80;
+          inset-inline: 0;
+          top: calc(100% + 10px);
+          display: grid;
+          gap: 4px;
+          padding: 7px;
+          border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+          border-radius: 14px;
+          background: var(--surface);
+          box-shadow: 0 18px 48px -18px rgba(0, 0, 0, 0.38);
+          animation: nc-menu-in 0.16s ease both;
+        }
+        @keyframes nc-menu-in {
+          from { opacity: 0; transform: translateY(-5px) scale(0.985); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .nc-currency-option {
+          display: grid;
+          grid-template-columns: 54px minmax(0, 1fr) 20px;
+          align-items: center;
+          gap: 10px;
+          min-height: 42px;
+          padding: 7px 10px;
+          border: 1px solid transparent;
+          border-radius: 10px;
+          background: transparent;
+          color: var(--text);
+          text-align: start;
+          font: inherit;
+          cursor: pointer;
+          transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .nc-currency-option:hover,
+        .nc-currency-option:focus-visible {
+          outline: none;
+          border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
+          background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+        }
+        .nc-currency-option.is-selected {
+          border-color: color-mix(in srgb, var(--primary) 34%, var(--border));
+          background: color-mix(in srgb, var(--primary) 13%, var(--surface));
+        }
+        .nc-currency-code {
+          color: var(--primary);
+          font-family: "DM Mono", monospace;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+        }
+        .nc-currency-name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 13px;
+          font-weight: 600;
+        }
+        .nc-currency-check {
+          color: var(--primary);
+          font-weight: 900;
+          text-align: center;
         }
 
         .nc-currency-badge {
@@ -632,10 +945,15 @@ export default function NewCasePage() {
         }
 
         .nc-row {
+          position: relative;
+          z-index: 1;
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 24px;
           animation: field-in 0.5s ease calc(var(--fi, 0) * 60ms + 200ms) both;
+        }
+        .nc-row:has(.nc-field--focused) {
+          z-index: 120;
         }
 
         .nc-divider {

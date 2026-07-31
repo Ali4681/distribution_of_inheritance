@@ -11,6 +11,9 @@ import { CreateCaseDto } from './dto/create-case.dto';
 import { UpdateCaseDto } from './dto/update-case.dto';
 
 const caseInclude = {
+  properties: {
+    orderBy: { createdAt: 'asc' as const },
+  },
   familyMembers: {
     orderBy: [{ relationType: 'asc' as const }, { fullName: 'asc' as const }],
   },
@@ -46,6 +49,15 @@ export class CasesService {
         mandatoryWill: createCaseDto.mandatoryWill ?? 0,
         optionalWill: createCaseDto.optionalWill ?? 0,
         currency: createCaseDto.currency ?? 'SAR',
+        properties: createCaseDto.properties?.length
+          ? {
+              create: createCaseDto.properties.map((property) => ({
+                name: property.name.trim(),
+                description: property.description?.trim() || null,
+                totalShares: property.totalShares ?? 2400,
+              })),
+            }
+          : undefined,
       },
       include: caseInclude,
     });
@@ -103,6 +115,16 @@ export class CasesService {
         mandatoryWill: updateCaseDto.mandatoryWill,
         optionalWill: updateCaseDto.optionalWill,
         currency: updateCaseDto.currency,
+        properties: updateCaseDto.properties
+          ? {
+              deleteMany: {},
+              create: updateCaseDto.properties.map((property) => ({
+                name: property.name.trim(),
+                description: property.description?.trim() || null,
+                totalShares: property.totalShares ?? 2400,
+              })),
+            }
+          : undefined,
       },
       include: caseInclude,
     });

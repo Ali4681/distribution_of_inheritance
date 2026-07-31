@@ -8,7 +8,7 @@ import type {
 } from "@/types";
 
 const MEMBER_WIDTH = 214;
-const MEMBER_HEIGHT = 112;
+const MEMBER_HEIGHT = 148;
 const DECEASED_WIDTH = 232;
 const DECEASED_HEIGHT = 118;
 const UNION_WIDTH = 56;
@@ -18,6 +18,7 @@ export type TreeFlowNodeData = Record<string, unknown> & {
   treeNode: FamilyTreeNode;
   locale: "en" | "ar";
   selected: boolean;
+  totalPropertyShares: number;
 };
 
 export type TreeFlowEdgeData = Record<string, unknown> & {
@@ -28,6 +29,7 @@ export function buildFlowTree(
   tree: FamilyTreeResponse,
   locale: "en" | "ar",
   selectedId?: string,
+  totalPropertyShares = 0,
 ): {
   nodes: Node<TreeFlowNodeData>[];
   edges: Edge<TreeFlowEdgeData>[];
@@ -77,6 +79,7 @@ export function buildFlowTree(
         treeNode,
         locale,
         selected: selectedId === treeNode.id,
+        totalPropertyShares,
       },
       draggable: false,
     };

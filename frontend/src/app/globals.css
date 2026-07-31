@@ -1138,6 +1138,40 @@ button:disabled {
   line-height: 1.1;
 }
 
+.pdp-head-selects {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.pdp-head-select {
+  min-width: 7.25rem;
+  height: 2rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  font-family: "Syne", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.pdp-head-select--year {
+  min-width: 5.1rem;
+  font-family: "DM Mono", monospace;
+}
+
+.pdp-head-select:hover,
+.pdp-head-select:focus {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
 .pdp-nav {
   display: inline-flex;
   width: 2.2rem;
@@ -1163,6 +1197,12 @@ button:disabled {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
   color: var(--primary);
+}
+
+.pdp-nav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .pdp-weekdays {
