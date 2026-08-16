@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { startTransition, useDeferredValue, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useApp } from "@/components/providers/AppProvider";
@@ -23,10 +22,6 @@ function readString(source: unknown, key: string) {
 
 function getFallbackCaseName(log: AuditLogItem) {
   return readString(log.changes, "deceasedName");
-}
-
-function getFallbackCaseId(log: AuditLogItem) {
-  return readString(log.changes, "caseId");
 }
 
 function getActionTone(action: string) {
@@ -53,7 +48,6 @@ export default function AdminAuditLogsPage() {
   const [scope, setScope] = useState<ScopeFilter>("all");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
-  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
   const deferredSearch = useDeferredValue(search.trim());
   const hasCase =
@@ -70,8 +64,6 @@ export default function AdminAuditLogsPage() {
     hasCase,
   });
 
-  const selectedLog =
-    data.items.find((item) => item.id === selectedLogId) ?? data.items[0] ?? null;
   const selectedUser = userId
     ? (users ?? []).find((item) => item.id === userId) ?? null
     : null;
@@ -117,22 +109,6 @@ export default function AdminAuditLogsPage() {
       setDateTo("");
       setScope("all");
       setLimit(20);
-      setPage(1);
-      setSelectedLogId(null);
-    });
-  }
-
-  function filterByActor(id: string) {
-    startTransition(() => {
-      setUserId(id);
-      setPage(1);
-    });
-  }
-
-  function filterByCase(id: string) {
-    startTransition(() => {
-      setCaseId(id);
-      setScope("linked");
       setPage(1);
     });
   }
@@ -428,21 +404,14 @@ export default function AdminAuditLogsPage() {
           <span>{t.action}</span>
           <span>{t.actor}</span>
           <span>{t.case}</span>
-          <span>{t.ipAddress}</span>
         </div>
 
           <div className="al-list">
             {data.items.map((item) => {
-              const isActive = item.id === selectedLog?.id;
               const caseName = item.case?.deceasedName ?? getFallbackCaseName(item);
 
               return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`al-row ${isActive ? "is-active" : ""}`}
-                  onClick={() => setSelectedLogId(item.id)}
-                >
+                <div key={item.id} className="al-row">
                   <span className="al-cell">
                     <span className="al-cell-label">{t.performedAt}</span>
                     <span>{formatDateTime(item.performedAt, locale)}</span>
@@ -474,11 +443,7 @@ export default function AdminAuditLogsPage() {
                     </span>
                   </span>
 
-                  <span className="al-cell">
-                    <span className="al-cell-label">{t.ipAddress}</span>
-                    <code>{item.ipAddress ?? "-"}</code>
-                  </span>
-                </button>
+                </div>
               );
             })}
 
@@ -532,86 +497,6 @@ export default function AdminAuditLogsPage() {
           </footer>
         </div>
 
-        <aside className="al-detail">
-          {selectedLog ? (
-            <>
-              <div className="al-detail-head">
-                <span
-                  className={`al-badge al-badge--${getActionTone(selectedLog.action)}`}
-                >
-                  {auditActionLabel(selectedLog.action, t)}
-                </span>
-                <h2>{t.auditDetails}</h2>
-                <p>{formatDateTime(selectedLog.performedAt, locale)}</p>
-              </div>
-
-              <div className="al-detail-grid">
-                <div className="al-detail-card">
-                  <span className="al-detail-label">{t.actor}</span>
-                  <strong>{selectedLog.user.name}</strong>
-                  <small>{selectedLog.user.email}</small>
-                  <small>
-                    {roleLabel(selectedLog.user.role, t)} / {selectedLog.user.id}
-                  </small>
-                  <button
-                    type="button"
-                    className="al-inline-btn"
-                    onClick={() => filterByActor(selectedLog.user.id)}
-                  >
-                    {t.filterByActor}
-                  </button>
-                </div>
-
-                <div className="al-detail-card">
-                  <span className="al-detail-label">{t.case}</span>
-                  <strong>
-                    {selectedLog.case?.deceasedName ??
-                      getFallbackCaseName(selectedLog) ??
-                      t.noCaseLinked}
-                  </strong>
-                  <small>
-                    {selectedLog.case?.id ?? getFallbackCaseId(selectedLog) ?? "-"}
-                  </small>
-
-                  {selectedLog.case?.id ? (
-                    <div className="al-card-actions">
-                      <button
-                        type="button"
-                        className="al-inline-btn"
-                        onClick={() => filterByCase(selectedLog.case!.id)}
-                      >
-                        {t.filterByCase}
-                      </button>
-                      <Link href={`/cases/${selectedLog.case.id}`} className="al-link">
-                        {t.openCase}
-                      </Link>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="al-meta-panel">
-                <div className="al-meta-row">
-                  <span>{t.eventId}</span>
-                  <code>{selectedLog.id}</code>
-                </div>
-                <div className="al-meta-row">
-                  <span>{t.ipAddress}</span>
-                  <code>{selectedLog.ipAddress ?? "-"}</code>
-                </div>
-                <div className="al-meta-row">
-                  <span>{t.action}</span>
-                  <code>{selectedLog.action}</code>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="al-placeholder">
-              <Icon name="activity" size={26} />
-              <p>{t.selectAuditEntry}</p>
-            </div>
-          )}
-        </aside>
       </section>
 
       <style jsx global>{`
@@ -1031,7 +916,67 @@ export default function AdminAuditLogsPage() {
 
         .al-select {
           appearance: none;
+          color-scheme: light;
           cursor: pointer;
+          padding-inline-end: 2.8rem;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          background-image:
+            linear-gradient(45deg, transparent 50%, currentColor 50%),
+            linear-gradient(135deg, currentColor 50%, transparent 50%),
+            linear-gradient(
+              180deg,
+              color-mix(in srgb, var(--surface) 97%, white 3%),
+              color-mix(in srgb, var(--surface-2, #edf2f7) 58%, var(--surface))
+            );
+          background-position:
+            calc(100% - 1.15rem) 50%,
+            calc(100% - 0.85rem) 50%,
+            0 0;
+          background-size: 0.34rem 0.34rem, 0.34rem 0.34rem, 100% 100%;
+          background-repeat: no-repeat;
+        }
+
+        [dir="rtl"] .al-select {
+          padding-inline-start: 2.8rem;
+          padding-inline-end: 0.95rem;
+          background-position:
+            0.85rem 50%,
+            1.15rem 50%,
+            0 0;
+        }
+
+        .al-select:hover {
+          border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+          box-shadow:
+            inset 0 1px 0 color-mix(in srgb, white 44%, transparent),
+            0 14px 24px -20px rgba(15, 118, 110, 0.38);
+        }
+
+        .al-select option {
+          background: #ffffff;
+          color: #17202a;
+          font-weight: 600;
+        }
+
+        .al-select option:checked {
+          background: #dbeafe;
+          color: #0f172a;
+        }
+
+        .dark .al-select {
+          color-scheme: dark;
+        }
+
+        .dark .al-select option {
+          background: #151b23;
+          color: #edf2f7;
+        }
+
+        .dark .al-select option:checked {
+          background: #134e4a;
+          color: #ffffff;
         }
 
         .al-toolbar-foot {
@@ -1163,10 +1108,7 @@ export default function AdminAuditLogsPage() {
         }
 
         .al-layout {
-          display: grid;
-          grid-template-columns: minmax(0, 1.45fr) minmax(21rem, 0.9fr);
-          gap: 1rem;
-          align-items: start;
+          display: block;
         }
 
         .al-feed,
@@ -1224,7 +1166,7 @@ export default function AdminAuditLogsPage() {
         .al-list-head,
         .al-row {
           display: grid;
-          grid-template-columns: 1.15fr 1fr 1.2fr 1.1fr 0.8fr;
+          grid-template-columns: 1.1fr 1fr minmax(14rem, 1.45fr) 1.15fr;
           gap: 0.8rem;
         }
 
@@ -1249,21 +1191,11 @@ export default function AdminAuditLogsPage() {
           border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
           background: transparent;
           text-align: start;
-          cursor: pointer;
           transition: background 0.18s ease, transform 0.18s ease;
         }
 
         .al-row:hover {
           background: color-mix(in srgb, #0f766e 4%, transparent);
-        }
-
-        .al-row.is-active {
-          background: linear-gradient(
-            90deg,
-            color-mix(in srgb, #0f766e 12%, transparent),
-            color-mix(in srgb, #0f766e 3%, transparent)
-          );
-          box-shadow: inset 3px 0 0 #0f766e;
         }
 
         .al-cell {
