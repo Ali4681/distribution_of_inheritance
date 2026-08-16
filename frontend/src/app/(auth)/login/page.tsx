@@ -236,7 +236,7 @@ export default function LoginPage() {
         </div>
       </aside>
 
-      <style jsx global>{`
+      <style>{`
         .auth-shell {
           position: relative;
           display: grid;

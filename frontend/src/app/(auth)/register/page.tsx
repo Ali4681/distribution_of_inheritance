@@ -246,7 +246,7 @@ export default function RegisterPage() {
         </div>
       </section>
 
-      <style jsx global>{`
+      <style>{`
         /* ——— Shared styles (same as login) ——— */
         .auth-shell {
           position: relative;
